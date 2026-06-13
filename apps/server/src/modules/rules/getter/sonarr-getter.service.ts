@@ -261,6 +261,12 @@ export class SonarrGetterService {
         return seasonEpisodesPromise;
       };
 
+      // Run-scoped cache for the full series episode list. Routes through
+      // `arrLookupCache` when provided so that ranking every episode of a
+      // long-running series (think 9000+ Jeopardy! episodes) only fetches
+      // the list once per show per rule-run; falls back to a single-`get()`
+      // memo otherwise. Evicts on transient `undefined` so one failed fetch
+      // doesn't poison the rest of the run (matches `resolveSeries` above).
       let showEpisodesPromise: Promise<SonarrEpisode[] | undefined> | undefined;
       const getShowEpisodes = async (): Promise<
         SonarrEpisode[] | undefined
@@ -269,7 +275,13 @@ export class SonarrGetterService {
           return undefined;
         }
 
-        showEpisodesPromise ??= sonarrApiClient.getEpisodes(showResponse.id);
+        showEpisodesPromise ??= arrLookupCache
+          ? arrLookupCache.memoize(
+              `sonarr:${settingsId}:episodes-all:${showResponse.id}`,
+              () => sonarrApiClient.getEpisodes(showResponse.id),
+              (episodes) => episodes === undefined,
+            )
+          : sonarrApiClient.getEpisodes(showResponse.id);
 
         return showEpisodesPromise;
       };
@@ -488,6 +500,64 @@ export class SonarrGetterService {
             ? showResponse.statistics.episodeCount -
                 showResponse.statistics.episodeFileCount
             : null;
+        }
+        case 'sw_episodeRank': {
+          // Rank of an episode within its show by air date (newest = 1).
+          // Pool excludes specials (S00), unaired, and null-airDate
+          // episodes; out-of-pool episodes get rank `null` so the
+          // comparator stays fail-closed.
+          if (dataType !== 'episode' || !origLibItem) {
+            return null;
+          }
+
+          const episodes = await getShowEpisodes();
+          if (episodes === undefined) {
+            return undefined;
+          }
+
+          // Project to (seasonNumber, episodeNumber, airMs) once so the sort
+          // comparator doesn't re-parse `airDateUtc` ~14× per item on a
+          // 9000-episode series. `Number.isFinite` also drops malformed
+          // dates, which the previous `new Date(...).getTime() <= nowMs`
+          // excluded via NaN comparison.
+          const nowMs = Date.now();
+          const pool = episodes
+            .map((e) => ({
+              seasonNumber: e.seasonNumber,
+              episodeNumber: e.episodeNumber,
+              airMs: e.airDateUtc ? new Date(e.airDateUtc).getTime() : NaN,
+            }))
+            .filter(
+              (e) =>
+                e.seasonNumber > 0 &&
+                Number.isFinite(e.airMs) &&
+                e.airMs <= nowMs,
+            );
+          if (pool.length === 0) {
+            return null;
+          }
+
+          pool.sort((a, b) => {
+            if (a.airMs !== b.airMs) return b.airMs - a.airMs;
+            if (b.seasonNumber !== a.seasonNumber) {
+              return b.seasonNumber - a.seasonNumber;
+            }
+            return b.episodeNumber - a.episodeNumber;
+          });
+
+          const targetSeasonNumber = origLibItem.grandparentId
+            ? origLibItem.parentIndex
+            : origLibItem.index;
+          const targetEpisodeNumber = origLibItem.grandparentId
+            ? origLibItem.index
+            : 1;
+
+          const idx = pool.findIndex(
+            (e) =>
+              e.seasonNumber === targetSeasonNumber &&
+              e.episodeNumber === targetEpisodeNumber,
+          );
+          return idx === -1 ? null : idx + 1;
         }
       }
     } catch (error) {

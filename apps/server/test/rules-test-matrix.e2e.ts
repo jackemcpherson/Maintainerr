@@ -759,6 +759,32 @@ function buildScenarioMatrix(): Scenario[] {
       ],
       values: [3, ['PlexUser', 'LocalUser'], true],
     },
+    {
+      name: 'sw_episodeRank-bigger-than-five-deletes-old-episodes',
+      dataType: 'episode',
+      mediaType: 'episode',
+      rules: [
+        createStoredRule(1, 0, {
+          action: RulePossibility.BIGGER,
+          firstVal: [Application.SONARR, 32],
+          customVal: { ruleTypeId: 0, value: '5' },
+        }),
+      ],
+      values: [7],
+    },
+    {
+      name: 'sw_episodeRank-smaller-than-six-keeps-top-five',
+      dataType: 'episode',
+      mediaType: 'episode',
+      rules: [
+        createStoredRule(1, 0, {
+          action: RulePossibility.SMALLER,
+          firstVal: [Application.SONARR, 32],
+          customVal: { ruleTypeId: 0, value: '6' },
+        }),
+      ],
+      values: [3],
+    },
     ...buildGeneratedMatrix(),
   ];
 }
