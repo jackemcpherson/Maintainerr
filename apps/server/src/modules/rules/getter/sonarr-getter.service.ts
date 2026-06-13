@@ -510,40 +510,69 @@ export class SonarrGetterService {
             return null;
           }
 
-          const episodes = await getShowEpisodes();
-          if (episodes === undefined) {
+          // The derived rank map is the same for every episode of the show
+          // within a single run, so cache it through `arrLookupCache` —
+          // otherwise a 9000-episode series re-sorts the pool 9000 times
+          // (O(N² log N)) instead of once.
+          const buildRankMap = async (): Promise<
+            Map<string, number> | undefined
+          > => {
+            const episodes = await getShowEpisodes();
+            if (episodes === undefined) {
+              return undefined;
+            }
+
+            const nowMs = Date.now();
+            const pool = episodes
+              .map((e) => ({
+                seasonNumber: e.seasonNumber,
+                episodeNumber: e.episodeNumber,
+                // Sonarr emits `'0001-01-01T00:00:00Z'` as the .NET null-date
+                // sentinel (see the `showResponse.added` checks above). It
+                // parses to a finite very-negative ms and would otherwise
+                // sneak into the pool with a bogus year-1 air date.
+                airMs:
+                  e.airDateUtc && e.airDateUtc !== '0001-01-01T00:00:00Z'
+                    ? new Date(e.airDateUtc).getTime()
+                    : NaN,
+              }))
+              .filter(
+                (e) =>
+                  e.seasonNumber > 0 &&
+                  Number.isFinite(e.airMs) &&
+                  e.airMs <= nowMs,
+              );
+
+            pool.sort((a, b) => {
+              if (a.airMs !== b.airMs) return b.airMs - a.airMs;
+              if (b.seasonNumber !== a.seasonNumber) {
+                return b.seasonNumber - a.seasonNumber;
+              }
+              return b.episodeNumber - a.episodeNumber;
+            });
+
+            const rankMap = new Map<string, number>();
+            for (let i = 0; i < pool.length; i++) {
+              const e = pool[i];
+              rankMap.set(`${e.seasonNumber}:${e.episodeNumber}`, i + 1);
+            }
+            return rankMap;
+          };
+
+          const rankMap = await (arrLookupCache
+            ? arrLookupCache.memoize(
+                `sonarr:${settingsId}:episode-rank-map:${showResponse.id}`,
+                buildRankMap,
+                (map) => map === undefined,
+              )
+            : buildRankMap());
+
+          if (rankMap === undefined) {
             return undefined;
           }
-
-          // Project to (seasonNumber, episodeNumber, airMs) once so the sort
-          // comparator doesn't re-parse `airDateUtc` ~14× per item on a
-          // 9000-episode series. `Number.isFinite` also drops malformed
-          // dates, which the previous `new Date(...).getTime() <= nowMs`
-          // excluded via NaN comparison.
-          const nowMs = Date.now();
-          const pool = episodes
-            .map((e) => ({
-              seasonNumber: e.seasonNumber,
-              episodeNumber: e.episodeNumber,
-              airMs: e.airDateUtc ? new Date(e.airDateUtc).getTime() : NaN,
-            }))
-            .filter(
-              (e) =>
-                e.seasonNumber > 0 &&
-                Number.isFinite(e.airMs) &&
-                e.airMs <= nowMs,
-            );
-          if (pool.length === 0) {
+          if (rankMap.size === 0) {
             return null;
           }
-
-          pool.sort((a, b) => {
-            if (a.airMs !== b.airMs) return b.airMs - a.airMs;
-            if (b.seasonNumber !== a.seasonNumber) {
-              return b.seasonNumber - a.seasonNumber;
-            }
-            return b.episodeNumber - a.episodeNumber;
-          });
 
           const targetSeasonNumber = origLibItem.grandparentId
             ? origLibItem.parentIndex
@@ -552,12 +581,9 @@ export class SonarrGetterService {
             ? origLibItem.index
             : 1;
 
-          const idx = pool.findIndex(
-            (e) =>
-              e.seasonNumber === targetSeasonNumber &&
-              e.episodeNumber === targetEpisodeNumber,
+          return (
+            rankMap.get(`${targetSeasonNumber}:${targetEpisodeNumber}`) ?? null
           );
-          return idx === -1 ? null : idx + 1;
         }
       }
     } catch (error) {

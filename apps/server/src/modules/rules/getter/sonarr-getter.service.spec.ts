@@ -1128,6 +1128,39 @@ describe('SonarrGetterService', () => {
       expect(response).toBeNull();
     });
 
+    it('excludes episodes whose airDateUtc is the Sonarr null-date sentinel (0001-01-01T00:00:00Z)', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-06-13T12:00:00Z'));
+      const series = createSonarrSeries({ id: 7, seasons: [] });
+      const episodes = [
+        // The sentinel parses to a finite, very-negative epoch ms and would
+        // otherwise sneak into the pool with a bogus year-1 air date.
+        createSonarrEpisode({
+          seriesId: series.id,
+          seasonNumber: 1,
+          episodeNumber: 1,
+          airDateUtc: '0001-01-01T00:00:00Z',
+        }),
+        createSonarrEpisode({
+          seriesId: series.id,
+          seasonNumber: 1,
+          episodeNumber: 2,
+          airDateUtc: '2026-06-11T00:00:00Z',
+        }),
+      ];
+
+      const sentinel = await callRank(series, episodes, {
+        seasonNumber: 1,
+        episodeNumber: 1,
+      });
+      expect(sentinel.response).toBeNull();
+
+      const aired = await callRank(series, episodes, {
+        seasonNumber: 1,
+        episodeNumber: 2,
+      });
+      expect(aired.response).toBe(1);
+    });
+
     it('returns null for an evaluated specials episode (season 0 excluded from pool)', async () => {
       jest.useFakeTimers().setSystemTime(new Date('2026-06-13T12:00:00Z'));
       const series = createSonarrSeries({ id: 7, seasons: [] });
