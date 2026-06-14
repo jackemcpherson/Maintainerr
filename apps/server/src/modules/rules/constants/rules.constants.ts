@@ -938,6 +938,14 @@ export class RuleConstants {
           type: RuleType.NUMBER,
           showType: ['episode'],
         },
+        {
+          id: 33,
+          name: 'seriesTitle',
+          humanName: 'Series title',
+          mediaType: MediaType.SHOW,
+          type: RuleType.TEXT,
+          showType: ['show', 'season', 'episode'],
+        },
       ],
     },
     {

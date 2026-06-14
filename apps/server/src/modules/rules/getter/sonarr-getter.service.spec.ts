@@ -993,6 +993,57 @@ describe('SonarrGetterService', () => {
     });
   });
 
+  describe('seriesTitle', () => {
+    const callSeriesTitle = async (
+      series: SonarrSeries | undefined,
+      type: MediaItemType,
+    ) => {
+      const collectionMedia = createCollectionMedia(type);
+      collectionMedia.collection.sonarrSettingsId = 1;
+
+      mockMediaServer.getMetadata.mockResolvedValue(
+        createMediaItem({ type: 'show' }),
+      );
+
+      const mockedSonarrApi = mockSonarrApi(series);
+
+      return sonarrGetterService.get(
+        33,
+        createMediaItem({
+          type,
+          ...(type === 'episode'
+            ? { grandparentId: 'show-1', parentIndex: 1, index: 1 }
+            : {}),
+        }),
+        type,
+        createRulesDto({
+          collection: collectionMedia.collection,
+          dataType: type,
+        }),
+      );
+    };
+
+    it.each(['show', 'season', 'episode'] as const)(
+      'returns the Sonarr series title for %s scope',
+      async (type) => {
+        const series = createSonarrSeries({ title: 'Sample Series' });
+        const response = await callSeriesTitle(series, type);
+        expect(response).toBe('Sample Series');
+      },
+    );
+
+    it('returns null when Sonarr confirms the series is not tracked', async () => {
+      // Empty series object (no id, no title) is the "confirmed not in
+      // Sonarr" shape that `resolveSeries` translates to a present-but-empty
+      // record. The getter should surface null, not undefined.
+      const response = await callSeriesTitle(
+        createSonarrSeries({ title: undefined as any }),
+        'episode',
+      );
+      expect(response).toBeNull();
+    });
+  });
+
   describe('episodeFileRank', () => {
     const callRank = async (
       series: SonarrSeries,

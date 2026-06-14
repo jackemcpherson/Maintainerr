@@ -326,6 +326,9 @@ export class SonarrGetterService {
             ?.filter((el) => tagIds.includes(el.id))
             .map((el) => el.label);
         }
+        case 'seriesTitle': {
+          return showResponse.title ?? null;
+        }
         case 'qualityProfileId': {
           const episodeFile = await getEpisodeFile();
           if (dataType === 'episode' && episodeFile) {
