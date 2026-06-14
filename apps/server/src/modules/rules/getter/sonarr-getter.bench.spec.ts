@@ -54,18 +54,20 @@ describeMaybe('episodeFileRank — benchmark', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  const makeMockApi = (series: any, episodes: any[], counter: { n: number }) => {
+  const makeMockApi = (
+    series: any,
+    episodes: any[],
+    counter: { n: number },
+  ) => {
     const mockedSonarrApi = new SonarrApi(
       { url: 'http://localhost:8989', apiKey: 'test' },
       logger as any,
     );
     jest.spyOn(mockedSonarrApi, 'getSeriesByTvdbId').mockResolvedValue(series);
-    jest
-      .spyOn(mockedSonarrApi, 'getEpisodes')
-      .mockImplementation(async (..._args: any[]) => {
-        counter.n += 1;
-        return episodes;
-      });
+    jest.spyOn(mockedSonarrApi, 'getEpisodes').mockImplementation(async () => {
+      counter.n += 1;
+      return episodes;
+    });
     servarrService.getSonarrApiClient.mockResolvedValue(mockedSonarrApi);
     return mockedSonarrApi;
   };
@@ -149,7 +151,7 @@ describeMaybe('episodeFileRank — benchmark', () => {
         `getEpisodes calls: ${String(cacheCalls.n).padStart(5)}`,
         `speedup: ${speedup.toFixed(1)}x`,
       ].join('  |  ');
-      // eslint-disable-next-line no-console
+
       console.log(row);
 
       expect(cacheMs).toBeLessThan(noCacheMs);

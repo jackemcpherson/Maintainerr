@@ -1005,7 +1005,7 @@ describe('SonarrGetterService', () => {
         createMediaItem({ type: 'show' }),
       );
 
-      const mockedSonarrApi = mockSonarrApi(series);
+      mockSonarrApi(series);
 
       return sonarrGetterService.get(
         33,
