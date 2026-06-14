@@ -512,12 +512,18 @@ export class SonarrGetterService {
             return null;
           }
 
-          // The derived rank map is the same for every episode of the show
-          // within a single run, so cache it through `arrLookupCache` —
+          // The derived rank maps are the same for every episode of the
+          // show within a single run, so cache through `arrLookupCache` —
           // otherwise a 9000-episode series re-sorts the pool 9000 times
-          // (O(N² log N)) instead of once.
-          const buildRankMap = async (): Promise<
-            Map<string, number> | undefined
+          // (O(N² log N)) instead of once. The airDate map carries the
+          // fallback used by daily-series Plex items (no episode number,
+          // only a date); both maps share one cache entry.
+          const buildRankMaps = async (): Promise<
+            | {
+                rankByEpisode: Map<string, number>;
+                rankByAirDate: Map<number, number>;
+              }
+            | undefined
           > => {
             const episodes = await getShowEpisodes();
             if (episodes === undefined) {
@@ -526,19 +532,26 @@ export class SonarrGetterService {
 
             const nowMs = Date.now();
             const pool = episodes
-              .map((e) => ({
-                seasonNumber: e.seasonNumber,
-                episodeNumber: e.episodeNumber,
-                hasFile: e.hasFile,
-                // Sonarr emits `'0001-01-01T00:00:00Z'` as the .NET null-date
-                // sentinel (see the `showResponse.added` checks above). It
-                // parses to a finite very-negative ms and would otherwise
-                // sneak into the pool with a bogus year-1 air date.
-                airMs:
+              .map((e) => {
+                // Sonarr emits `'0001-01-01T00:00:00Z'` as the .NET
+                // null-date sentinel (see the `showResponse.added` checks
+                // above). It parses to a finite very-negative ms and would
+                // otherwise sneak into the pool with a bogus year-1 air
+                // date.
+                const airMs =
                   e.airDateUtc && e.airDateUtc !== '0001-01-01T00:00:00Z'
                     ? new Date(e.airDateUtc).getTime()
+                    : NaN;
+                return {
+                  seasonNumber: e.seasonNumber,
+                  episodeNumber: e.episodeNumber,
+                  hasFile: e.hasFile,
+                  airMs,
+                  airDayBucket: Number.isFinite(airMs)
+                    ? Math.floor(airMs / 86_400_000)
                     : NaN,
-              }))
+                };
+              })
               .filter(
                 (e) =>
                   e.hasFile === true &&
@@ -555,26 +568,36 @@ export class SonarrGetterService {
               return b.episodeNumber - a.episodeNumber;
             });
 
-            const rankMap = new Map<string, number>();
+            const rankByEpisode = new Map<string, number>();
+            const rankByAirDate = new Map<number, number>();
             for (let i = 0; i < pool.length; i++) {
               const e = pool[i];
-              rankMap.set(`${e.seasonNumber}:${e.episodeNumber}`, i + 1);
+              const rank = i + 1;
+              rankByEpisode.set(`${e.seasonNumber}:${e.episodeNumber}`, rank);
+              // First-wins on same-day collisions: the newer episode of a
+              // same-day double already holds the slot, which is the
+              // conservative (keep) outcome when a daily-series Plex item
+              // carries only the date.
+              if (!rankByAirDate.has(e.airDayBucket)) {
+                rankByAirDate.set(e.airDayBucket, rank);
+              }
             }
-            return rankMap;
+            return { rankByEpisode, rankByAirDate };
           };
 
-          const rankMap = await (arrLookupCache
+          const rankMaps = await (arrLookupCache
             ? arrLookupCache.memoize(
                 `sonarr:${settingsId}:episode-rank-map:${showResponse.id}`,
-                buildRankMap,
-                (map) => map === undefined,
+                buildRankMaps,
+                (maps) => maps === undefined,
               )
-            : buildRankMap());
+            : buildRankMaps());
 
-          if (rankMap === undefined) {
+          if (rankMaps === undefined) {
             return undefined;
           }
-          if (rankMap.size === 0) {
+          const { rankByEpisode, rankByAirDate } = rankMaps;
+          if (rankByEpisode.size === 0) {
             return null;
           }
 
@@ -585,9 +608,38 @@ export class SonarrGetterService {
             ? origLibItem.index
             : 1;
 
-          return (
-            rankMap.get(`${targetSeasonNumber}:${targetEpisodeNumber}`) ?? null
+          const directRank = rankByEpisode.get(
+            `${targetSeasonNumber}:${targetEpisodeNumber}`,
           );
+          if (directRank !== undefined) {
+            return directRank;
+          }
+
+          // Daily-series fallback: Plex episodes for daily-air shows carry
+          // `parentIndex = <year>` but no `index`, so the season:episode
+          // lookup misses. Sonarr identifies these episodes by air date, so
+          // when there's no episode number to key by, fall back to the
+          // airDate map. `originallyAvailableAt` is mapped to a Date by the
+          // Plex/Jellyfin/Emby adapters; an invalid Date or the .NET null
+          // sentinel returns null (fail-closed).
+          if (targetEpisodeNumber === undefined) {
+            const target = origLibItem.originallyAvailableAt;
+            if (!(target instanceof Date)) {
+              return null;
+            }
+            const targetMs = target.getTime();
+            if (!Number.isFinite(targetMs)) {
+              return null;
+            }
+            // Reject the .NET null sentinel symmetrically with the pool side.
+            if (target.toISOString() === '0001-01-01T00:00:00.000Z') {
+              return null;
+            }
+            const targetDayBucket = Math.floor(targetMs / 86_400_000);
+            return rankByAirDate.get(targetDayBucket) ?? null;
+          }
+
+          return null;
         }
       }
     } catch (error) {
