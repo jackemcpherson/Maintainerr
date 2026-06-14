@@ -263,8 +263,8 @@ export class SonarrGetterService {
 
       // Run-scoped cache for the full series episode list. Routes through
       // `arrLookupCache` when provided so that ranking every episode of a
-      // long-running series (think 9000+ Jeopardy! episodes) only fetches
-      // the list once per show per rule-run; falls back to a single-`get()`
+      // long-running daily series (think 9000+ episodes) only fetches the
+      // list once per show per rule-run; falls back to a single-`get()`
       // memo otherwise. Evicts on transient `undefined` so one failed fetch
       // doesn't poison the rest of the run (matches `resolveSeries` above).
       let showEpisodesPromise: Promise<SonarrEpisode[] | undefined> | undefined;
