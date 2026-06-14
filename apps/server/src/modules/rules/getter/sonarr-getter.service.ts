@@ -536,7 +536,7 @@ export class SonarrGetterService {
           const buildRankMaps = async (): Promise<
             | {
                 rankByEpisode: Map<string, number>;
-                rankByAirDate: Map<number, number>;
+                rankByAirDate: Map<string, number>;
               }
             | undefined
           > => {
@@ -561,9 +561,13 @@ export class SonarrGetterService {
                   episodeNumber: e.episodeNumber,
                   hasFile: e.hasFile,
                   airMs,
-                  airDayBucket: Number.isFinite(airMs)
-                    ? Math.floor(airMs / 86_400_000)
-                    : NaN,
+                  // Sonarr ships `airDate` as the broadcast-day in the show's local
+                  // calendar (YYYY-MM-DD). Plex's `originallyAvailableAt` parses to the
+                  // same calendar date via ISO date-only semantics, so keying on the
+                  // string aligns both sides without UTC-day math (which would slip a
+                  // day for any primetime broadcast outside UTC).
+                  airDayKey:
+                    e.airDate && e.airDate !== '0001-01-01' ? e.airDate : null,
                 };
               })
               .filter(
@@ -583,7 +587,7 @@ export class SonarrGetterService {
             });
 
             const rankByEpisode = new Map<string, number>();
-            const rankByAirDate = new Map<number, number>();
+            const rankByAirDate = new Map<string, number>();
             for (let i = 0; i < pool.length; i++) {
               const e = pool[i];
               const rank = i + 1;
@@ -592,8 +596,8 @@ export class SonarrGetterService {
               // same-day double already holds the slot, which is the
               // conservative (keep) outcome when a daily-series Plex item
               // carries only the date.
-              if (!rankByAirDate.has(e.airDayBucket)) {
-                rankByAirDate.set(e.airDayBucket, rank);
+              if (e.airDayKey !== null && !rankByAirDate.has(e.airDayKey)) {
+                rankByAirDate.set(e.airDayKey, rank);
               }
             }
             return { rankByEpisode, rankByAirDate };
@@ -649,8 +653,12 @@ export class SonarrGetterService {
             if (target.toISOString() === '0001-01-01T00:00:00.000Z') {
               return null;
             }
-            const targetDayBucket = Math.floor(targetMs / 86_400_000);
-            return rankByAirDate.get(targetDayBucket) ?? null;
+            // ISO date-only parsing of Plex/Jellyfin/Emby `originallyAvailableAt`
+            // lands the Date at UTC-midnight of the broadcast date, so the leading
+            // 10 chars are the broadcast-day YYYY-MM-DD — matching Sonarr's
+            // `airDate` shape exactly.
+            const targetDayKey = target.toISOString().slice(0, 10);
+            return rankByAirDate.get(targetDayKey) ?? null;
           }
 
           return null;

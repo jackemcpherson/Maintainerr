@@ -1530,6 +1530,7 @@ describe('SonarrGetterService', () => {
           seriesId: series.id,
           seasonNumber: 2026,
           episodeNumber: 100,
+          airDate: '2026-06-09',
           airDateUtc: '2026-06-09T18:30:00Z',
           hasFile: true,
         }),
@@ -1537,6 +1538,7 @@ describe('SonarrGetterService', () => {
           seriesId: series.id,
           seasonNumber: 2026,
           episodeNumber: 101,
+          airDate: '2026-06-10',
           airDateUtc: '2026-06-10T18:30:00Z',
           hasFile: true,
         }),
@@ -1544,6 +1546,7 @@ describe('SonarrGetterService', () => {
           seriesId: series.id,
           seasonNumber: 2026,
           episodeNumber: 102,
+          airDate: '2026-06-11',
           airDateUtc: '2026-06-11T18:30:00Z',
           hasFile: true,
         }),
@@ -1572,6 +1575,7 @@ describe('SonarrGetterService', () => {
           seriesId: series.id,
           seasonNumber: 2026,
           episodeNumber: 100,
+          airDate: '2026-06-09',
           airDateUtc: '2026-06-09T18:30:00Z',
           hasFile: true,
         }),
@@ -1592,6 +1596,7 @@ describe('SonarrGetterService', () => {
           seriesId: series.id,
           seasonNumber: 2026,
           episodeNumber: 100,
+          airDate: '2026-06-09',
           airDateUtc: '2026-06-09T18:30:00Z',
           hasFile: true,
         }),
@@ -1615,6 +1620,7 @@ describe('SonarrGetterService', () => {
           seriesId: series.id,
           seasonNumber: 2026,
           episodeNumber: 101,
+          airDate: sameDay,
           airDateUtc: `${sameDay}T17:00:00Z`,
           hasFile: true,
         }),
@@ -1622,6 +1628,7 @@ describe('SonarrGetterService', () => {
           seriesId: series.id,
           seasonNumber: 2026,
           episodeNumber: 102,
+          airDate: sameDay,
           airDateUtc: `${sameDay}T19:00:00Z`,
           hasFile: true,
         }),
@@ -1634,6 +1641,35 @@ describe('SonarrGetterService', () => {
         parentIndex: 2026,
         originallyAvailableAt: new Date(`${sameDay}T00:00:00Z`),
       });
+      expect(response).toBe(1);
+    });
+
+    it('matches by broadcast-date string when airDateUtc straddles UTC midnight (US primetime case)', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-06-13T12:00:00Z'));
+      const series = createSonarrSeries({ id: 7, seasons: [] });
+      // US primetime broadcast: 8pm Eastern on 2026-06-10 = 00:00 UTC
+      // on 2026-06-11. Sonarr's `airDate` carries the local broadcast
+      // date ('2026-06-10'); `airDateUtc` carries the UTC moment, which
+      // falls on the next UTC day. Plex's `originallyAvailableAt` for
+      // the same episode is the date-only string '2026-06-10' → parsed
+      // as 2026-06-10T00:00:00Z. The map key must agree on the broadcast
+      // date, not the UTC day of the moment.
+      const episodes = [
+        createSonarrEpisode({
+          seriesId: series.id,
+          seasonNumber: 2026,
+          episodeNumber: 161,
+          airDate: '2026-06-10',
+          airDateUtc: '2026-06-11T00:00:00Z',
+          hasFile: true,
+        }),
+      ];
+
+      const response = await callDailyRank(series, episodes, {
+        parentIndex: 2026,
+        originallyAvailableAt: new Date('2026-06-10T00:00:00Z'),
+      });
+
       expect(response).toBe(1);
     });
   });
