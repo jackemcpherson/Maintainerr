@@ -515,6 +515,15 @@ export class SonarrGetterService {
             return null;
           }
 
+          // The air-date cutoff is captured here, not inside the cached
+          // builder, so it's observable at the case level and tied to the
+          // first build for this show within the run. A cache hit reuses
+          // the pool that was filtered against this `nowMs`; this is the
+          // intended behaviour — ranks stay consistent across every
+          // episode of the show in a single rule-run, even if a new
+          // episode airs mid-run (it gets picked up on the next run).
+          const nowMs = Date.now();
+
           // The derived rank maps are the same for every episode of the
           // show within a single run, so cache through `arrLookupCache` —
           // otherwise a 9000-episode series re-sorts the pool 9000 times
@@ -533,7 +542,6 @@ export class SonarrGetterService {
               return undefined;
             }
 
-            const nowMs = Date.now();
             const pool = episodes
               .map((e) => {
                 // Sonarr emits `'0001-01-01T00:00:00Z'` as the .NET
