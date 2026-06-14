@@ -1044,6 +1044,54 @@ describe('SonarrGetterService', () => {
     });
   });
 
+  describe('seriesId', () => {
+    const callSeriesId = async (
+      series: SonarrSeries | undefined,
+      type: MediaItemType,
+    ) => {
+      const collectionMedia = createCollectionMedia(type);
+      collectionMedia.collection.sonarrSettingsId = 1;
+
+      mockMediaServer.getMetadata.mockResolvedValue(
+        createMediaItem({ type: 'show' }),
+      );
+
+      mockSonarrApi(series);
+
+      return sonarrGetterService.get(
+        34,
+        createMediaItem({
+          type,
+          ...(type === 'episode'
+            ? { grandparentId: 'show-1', parentIndex: 1, index: 1 }
+            : {}),
+        }),
+        type,
+        createRulesDto({
+          collection: collectionMedia.collection,
+          dataType: type,
+        }),
+      );
+    };
+
+    it.each(['show', 'season', 'episode'] as const)(
+      'returns the Sonarr series id for %s scope',
+      async (type) => {
+        const series = createSonarrSeries({ id: 12345 });
+        const response = await callSeriesId(series, type);
+        expect(response).toBe(12345);
+      },
+    );
+
+    it('returns null when Sonarr confirms the series is not tracked', async () => {
+      const response = await callSeriesId(
+        createSonarrSeries({ id: undefined as any }),
+        'episode',
+      );
+      expect(response).toBeNull();
+    });
+  });
+
   describe('episodeFileRank', () => {
     const callRank = async (
       series: SonarrSeries,
