@@ -932,7 +932,8 @@ export class RuleConstants {
         {
           id: 32,
           name: 'episodeFileRank',
-          humanName: 'Episode rank by air date among downloaded (newest = 1)',
+          humanName:
+            'Rank among on-disk episodes per show by air date (newest = 1)',
           mediaType: MediaType.SHOW,
           type: RuleType.NUMBER,
           showType: ['episode'],
