@@ -501,11 +501,13 @@ export class SonarrGetterService {
                 showResponse.statistics.episodeFileCount
             : null;
         }
-        case 'sw_episodeRank': {
-          // Rank of an episode within its show by air date (newest = 1).
-          // Pool excludes specials (S00), unaired, and null-airDate
-          // episodes; out-of-pool episodes get rank `null` so the
-          // comparator stays fail-closed.
+        case 'episodeFileRank': {
+          // Rank an episode within its show by air date (newest = 1) among
+          // the episodes currently on disk. Pool requires `hasFile === true`
+          // and excludes specials (S00), unaired, and null-airDate episodes;
+          // out-of-pool episodes get rank `null` so the comparator stays
+          // fail-closed. Pair with a scope filter (`Sonarr.tags` or
+          // `Sonarr.seriesTitle`) to avoid library-wide application.
           if (dataType !== 'episode' || !origLibItem) {
             return null;
           }
@@ -527,6 +529,7 @@ export class SonarrGetterService {
               .map((e) => ({
                 seasonNumber: e.seasonNumber,
                 episodeNumber: e.episodeNumber,
+                hasFile: e.hasFile,
                 // Sonarr emits `'0001-01-01T00:00:00Z'` as the .NET null-date
                 // sentinel (see the `showResponse.added` checks above). It
                 // parses to a finite very-negative ms and would otherwise
@@ -538,6 +541,7 @@ export class SonarrGetterService {
               }))
               .filter(
                 (e) =>
+                  e.hasFile === true &&
                   e.seasonNumber > 0 &&
                   Number.isFinite(e.airMs) &&
                   e.airMs <= nowMs,

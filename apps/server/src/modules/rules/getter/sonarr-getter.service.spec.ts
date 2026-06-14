@@ -993,7 +993,7 @@ describe('SonarrGetterService', () => {
     });
   });
 
-  describe('sw_episodeRank', () => {
+  describe('episodeFileRank', () => {
     const callRank = async (
       series: SonarrSeries,
       episodes: ReturnType<typeof createSonarrEpisode>[],
@@ -1040,24 +1040,28 @@ describe('SonarrGetterService', () => {
           seasonNumber: 1,
           episodeNumber: 1,
           airDateUtc: '2026-06-09T00:00:00Z',
+          hasFile: true,
         }),
         createSonarrEpisode({
           seriesId: series.id,
           seasonNumber: 1,
           episodeNumber: 2,
           airDateUtc: '2026-06-10T00:00:00Z',
+          hasFile: true,
         }),
         createSonarrEpisode({
           seriesId: series.id,
           seasonNumber: 1,
           episodeNumber: 3,
           airDateUtc: '2026-06-11T00:00:00Z',
+          hasFile: true,
         }),
         createSonarrEpisode({
           seriesId: series.id,
           seasonNumber: 1,
           episodeNumber: 4,
           airDateUtc: '2026-06-12T00:00:00Z',
+          hasFile: true,
         }),
       ];
 
@@ -1079,6 +1083,7 @@ describe('SonarrGetterService', () => {
           seasonNumber: 1,
           episodeNumber: 1,
           airDateUtc: '2026-06-12T00:00:00Z',
+          hasFile: true,
         }),
       ];
 
@@ -1111,12 +1116,14 @@ describe('SonarrGetterService', () => {
           seasonNumber: 1,
           episodeNumber: 1,
           airDateUtc: '2026-07-01T00:00:00Z',
+          hasFile: true,
         }),
         createSonarrEpisode({
           seriesId: series.id,
           seasonNumber: 1,
           episodeNumber: 2,
           airDateUtc: '2026-07-02T00:00:00Z',
+          hasFile: true,
         }),
       ];
 
@@ -1139,12 +1146,14 @@ describe('SonarrGetterService', () => {
           seasonNumber: 1,
           episodeNumber: 1,
           airDateUtc: '0001-01-01T00:00:00Z',
+          hasFile: true,
         }),
         createSonarrEpisode({
           seriesId: series.id,
           seasonNumber: 1,
           episodeNumber: 2,
           airDateUtc: '2026-06-11T00:00:00Z',
+          hasFile: true,
         }),
       ];
 
@@ -1170,12 +1179,14 @@ describe('SonarrGetterService', () => {
           seasonNumber: 0,
           episodeNumber: 1,
           airDateUtc: '2026-06-10T00:00:00Z',
+          hasFile: true,
         }),
         createSonarrEpisode({
           seriesId: series.id,
           seasonNumber: 0,
           episodeNumber: 2,
           airDateUtc: '2026-06-11T00:00:00Z',
+          hasFile: true,
         }),
       ];
 
@@ -1197,12 +1208,14 @@ describe('SonarrGetterService', () => {
           seasonNumber: 1,
           episodeNumber: 9,
           airDateUtc: sharedDate,
+          hasFile: true,
         }),
         createSonarrEpisode({
           seriesId: series.id,
           seasonNumber: 1,
           episodeNumber: 10,
           airDateUtc: sharedDate,
+          hasFile: true,
         }),
       ];
 
@@ -1293,12 +1306,14 @@ describe('SonarrGetterService', () => {
           seasonNumber: 1,
           episodeNumber: 1,
           airDateUtc: '2026-06-11T00:00:00Z',
+          hasFile: true,
         }),
         createSonarrEpisode({
           seriesId: series.id,
           seasonNumber: 1,
           episodeNumber: 2,
           airDateUtc: '2026-06-12T00:00:00Z',
+          hasFile: true,
         }),
       ];
 
