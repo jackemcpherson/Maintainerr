@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>jackemcpherson/renovate-config"],
+  "forkProcessing": "enabled",
+  "ignoreDeps": ["@heroicons/react", "chalk"],
+  "packageRules": [
+    {
+      "description": "Group NestJS dependencies",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["@nestjs/**"],
+      "groupName": "NestJS"
+    },
+    {
+      "description": "Group React dependencies",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "react",
+        "react-dom",
+        "@types/react",
+        "@types/react-dom"
+      ],
+      "groupName": "React"
+    },
+    {
+      "description": "Group ESLint dependencies",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["@eslint/js", "eslint"],
+      "groupName": "ESLint"
+    }
+  ]
+}
